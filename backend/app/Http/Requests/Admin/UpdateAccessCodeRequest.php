@@ -4,7 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreAccessCodeRequest extends FormRequest
+class UpdateAccessCodeRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,16 +14,9 @@ class StoreAccessCodeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email'       => ['required', 'email', 'max:255', 'unique:access_codes,email'],
             'description' => ['nullable', 'string', 'max:500'],
+            'is_active'   => ['sometimes', 'boolean'],
             'expires_at'  => ['nullable', 'date', 'after:now'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'email.unique' => 'An access code already exists for this email address.',
         ];
     }
 }

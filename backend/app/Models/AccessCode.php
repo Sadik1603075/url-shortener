@@ -13,6 +13,8 @@ class AccessCode extends Model
     protected $fillable = [
         'user_id',
         'code',
+        'email',
+        'description',
         'is_active',
         'expires_at',
         'last_used_at',
@@ -21,8 +23,8 @@ class AccessCode extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
-            'expires_at' => 'datetime',
+            'is_active'    => 'boolean',
+            'expires_at'   => 'datetime',
             'last_used_at' => 'datetime',
         ];
     }
@@ -34,7 +36,7 @@ class AccessCode extends Model
 
     public function isValid(): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 

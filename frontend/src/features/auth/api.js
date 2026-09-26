@@ -3,7 +3,7 @@ import apiClient from '../../lib/apiClient';
 export async function login(credentials) {
     const response = await apiClient.post('/auth/login', credentials);
 
-    return response.data;
+    return response.data.data;
 }
 
 export async function logout() {

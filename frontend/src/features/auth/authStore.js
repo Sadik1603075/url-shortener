@@ -2,9 +2,19 @@ import { useSyncExternalStore } from 'react';
 
 const listeners = new Set();
 
+function loadUser() {
+  try {
+    const raw = localStorage.getItem('auth_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    localStorage.removeItem('auth_user');
+    return null;
+  }
+}
+
 let state = {
-  token: localStorage.getItem('auth_token'),
-  user: JSON.parse(localStorage.getItem('auth_user') || 'null'),
+  token: localStorage.getItem('auth_token') || null,
+  user: loadUser(),
 };
 
 function emit() {

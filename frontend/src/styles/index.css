@@ -912,3 +912,245 @@ tbody tr:last-child td {
     padding: 0 16px;
   }
 }
+
+/* -------------------------
+   Modal
+------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 13, 30, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-content {
+  width: min(460px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.2s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.optional {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* -------------------------
+   Action dropdown
+------------------------- */
+
+.action-menu {
+  position: relative;
+}
+
+.action-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 160px;
+  padding: 6px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: white;
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+  animation: fadeIn 0.1s ease;
+}
+
+.action-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.action-dropdown button:hover {
+  background: var(--surface-soft);
+}
+
+.action-dropdown button.danger {
+  color: var(--danger);
+}
+
+.action-dropdown button.danger:hover {
+  background: var(--danger-soft);
+}
+
+/* -------------------------
+   Status badge variants
+------------------------- */
+
+.status-active {
+  color: #087443;
+  background: var(--success-soft);
+}
+
+.status-inactive {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.row-inactive {
+  opacity: 0.55;
+}
+
+/* -------------------------
+   Table states
+------------------------- */
+
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.text-danger {
+  color: var(--danger);
+}
+
+/* -------------------------
+   Description cell
+------------------------- */
+
+.description-cell {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------
+   Edit modal info
+------------------------- */
+
+.edit-code-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.edit-email {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* -------------------------
+   Alert success
+------------------------- */
+
+.alert-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  margin-bottom: 18px;
+  border: 1px solid #c9f0db;
+  border-radius: 8px;
+  color: #087443;
+  background: var(--success-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* -------------------------
+   Utilities
+------------------------- */
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.logout-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: 0.15s;
+}
+
+.logout-button:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
