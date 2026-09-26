@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 
 import PublicLayout from '../components/layout/PublicLayout';
 import AdminLayout from '../components/layout/AdminLayout';
+import NotFound from '../components/common/NotFound';
 
 import GenerateUrlPage from '../features/shortUrls/GenerateUrlPage';
 import DashboardPage from '../features/shortUrls/DashboardPage';
@@ -13,6 +14,7 @@ import ProtectedRoute from '../features/auth/ProtectedRoute';
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
+    errorElement: <NotFound />,
     children: [
       {
         path: '/',
@@ -48,5 +50,10 @@ export const router = createBrowserRouter([
         ],
       },
     ],
+  },
+
+  {
+    path: '*',
+    element: <NotFound />,
   },
 ]);

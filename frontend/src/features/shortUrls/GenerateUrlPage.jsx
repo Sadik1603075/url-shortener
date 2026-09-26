@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import { ArrowRight, Check, Copy, Link2, ShieldCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  Copy,
+  Link2,
+  ShieldCheck,
+} from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useCreateShortUrl } from './hooks';
 
 const schema = z.object({
   access_code: z
@@ -15,25 +23,52 @@ const schema = z.object({
     .max(2048, 'URL is too long'),
 });
 
+function extractError(error) {
+  const response = error?.response;
+
+  if (response?.status === 422) {
+    const fieldErrors = response.data?.errors;
+
+    if (fieldErrors) {
+      const first = Object.values(fieldErrors)[0];
+      if (Array.isArray(first) && first[0]) return first[0];
+    }
+  }
+
+  return (
+    response?.data?.message ||
+    'Something went wrong. Please try again.'
+  );
+}
+
 export default function GenerateUrlPage() {
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const createMutation = useCreateShortUrl();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
   });
 
   async function onSubmit(data) {
-    // Connected to the Laravel API in the next step.
-    console.log(data);
+    setSubmitError(null);
+    setResult(null);
 
-    setResult({
-      short_url: 'http://localhost:8000/zn9edcu',
-    });
+    try {
+      const response = await createMutation.mutateAsync(data);
+
+      setResult(response.data);
+      reset();
+    } catch (error) {
+      setSubmitError(extractError(error));
+    }
   }
 
   async function copyUrl() {
@@ -113,11 +148,20 @@ export default function GenerateUrlPage() {
               )}
             </div>
 
+            {submitError && (
+              <div className="alert-error">
+                <AlertCircle size={15} />
+                {submitError}
+              </div>
+            )}
+
             <button
               className="primary-button"
-              disabled={isSubmitting}
+              disabled={isSubmitting || createMutation.isPending}
             >
-              {isSubmitting ? 'Creating...' : 'Create short link'}
+              {isSubmitting || createMutation.isPending
+                ? 'Creating...'
+                : 'Create short link'}
               <ArrowRight size={18} />
             </button>
           </form>

@@ -40,7 +40,7 @@ class EloquentShortUrlRepository implements ShortUrlRepositoryInterface
             'short_code' => $shortCode,
             'long_url'   => $longUrl,
             'expires_at' => $expiresAt,
-        ]);
+        ])->refresh();
     }
 
     public function update(ShortUrl $shortUrl, array $attributes): ShortUrl

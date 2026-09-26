@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   KeyRound,
   Link2,
   LayoutDashboard,
@@ -69,13 +68,15 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <NavLink
-          to="/admin/settings"
-          className="sidebar-link"
+        <button
+          type="button"
+          className="sidebar-link sidebar-link-disabled"
+          disabled
+          title="Settings — coming soon"
         >
           <Settings size={18} />
           <span>Settings</span>
-        </NavLink>
+        </button>
       </div>
     </aside>
   );

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -6,10 +6,9 @@ import {
   Check,
   KeyRound,
   Plus,
-  MoreHorizontal,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
+  Ban,
+  RotateCcw,
   Loader2,
   X,
   Mail,
@@ -67,88 +66,63 @@ function CopyButton({ text }) {
 }
 
 // ---------------------------------------------------------------------------
-// Action menu dropdown
+// Inline row actions (edit / expire / send / delete)
 // ---------------------------------------------------------------------------
 
-function ActionMenu({ accessCode, onToggle, onDelete, onEdit, onSendEmail }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-
-    return () =>
-      document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
+function RowActions({ accessCode, onToggle, onDelete, onEdit, onSendEmail }) {
   return (
-    <div className="action-menu" ref={ref}>
+    <div className="row-actions">
       <button
-        className="icon-button"
-        onClick={() => setOpen((prev) => !prev)}
+        type="button"
+        className="row-action-button"
+        onClick={onEdit}
+        title="Edit"
+        aria-label="Edit access code"
       >
-        <MoreHorizontal size={18} />
+        <Pencil size={15} />
       </button>
 
-      {open && (
-        <div className="action-dropdown">
-          <button
-            onClick={() => {
-              onEdit();
-              setOpen(false);
-            }}
-          >
-            <Pencil size={15} />
-            Edit
-          </button>
+      <button
+        type="button"
+        className="row-action-button"
+        onClick={onSendEmail}
+        title="Send email"
+        aria-label="Send access code by email"
+      >
+        <Mail size={15} />
+      </button>
 
-          <button
-            onClick={() => {
-              onSendEmail();
-              setOpen(false);
-            }}
-          >
-            <Mail size={15} />
-            Send email
-          </button>
-
-          <button
-            onClick={() => {
-              onToggle();
-              setOpen(false);
-            }}
-          >
-            {accessCode.is_active ? (
-              <>
-                <ToggleLeft size={15} />
-                Deactivate
-              </>
-            ) : (
-              <>
-                <ToggleRight size={15} />
-                Activate
-              </>
-            )}
-          </button>
-
-          <button
-            className="danger"
-            onClick={() => {
-              onDelete();
-              setOpen(false);
-            }}
-          >
-            <Trash2 size={15} />
-            Delete
-          </button>
-        </div>
+      {accessCode.is_active ? (
+        <button
+          type="button"
+          className="row-action-button row-action-warning"
+          onClick={onToggle}
+          title="Expire"
+          aria-label="Expire access code"
+        >
+          <Ban size={15} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="row-action-button row-action-success"
+          onClick={onToggle}
+          title="Reactivate"
+          aria-label="Reactivate access code"
+        >
+          <RotateCcw size={15} />
+        </button>
       )}
+
+      <button
+        type="button"
+        className="row-action-button row-action-danger"
+        onClick={onDelete}
+        title="Delete"
+        aria-label="Delete access code"
+      >
+        <Trash2 size={15} />
+      </button>
     </div>
   );
 }
@@ -598,7 +572,7 @@ export default function AccessCodesPage() {
                     <td>{formatDate(item.last_used_at)}</td>
 
                     <td>
-                      <ActionMenu
+                      <RowActions
                         accessCode={item}
                         onToggle={() => handleToggle(item)}
                         onDelete={() => handleDelete(item)}
