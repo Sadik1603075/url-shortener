@@ -23,8 +23,8 @@ class AccessCode extends Model
     protected function casts(): array
     {
         return [
-            'is_active'    => 'boolean',
-            'expires_at'   => 'datetime',
+            'is_active' => 'boolean',
+            'expires_at' => 'datetime',
             'last_used_at' => 'datetime',
         ];
     }

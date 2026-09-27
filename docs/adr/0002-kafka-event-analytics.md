@@ -1,47 +1,76 @@
-# ADR-0002: Kafka-based click analytics (event sourcing of redirects)
+# ADR-0002 — Click analytics via UrlClicked events (CQRS) over Kafka
 
-- **Status:** Proposed (confirm at roadmap tasks D4-T1 / D5-T1)
-- **Deciders:** Staff engineer (repo owner)
-- **Context date:** Phase 1, Day 4–5
+- **Status:** Accepted
+- **Date:** 2026-09-27
+- **Context tags:** hot-path, analytics, infra, event-sourcing
 
 ## Context
 
-We must track **how many people clicked** each short URL and **collect device info** (browser, OS, device type, referer, IP). The redirect is the hot path: it must stay fast and must not fail because an analytics write failed.
+A redirect (`GET /{code}`) is the product's hot path. It must be fast (Redis
+cache) and must **never fail or block** because analytics is slow or down
+(root `AGENTS.md` §1, §4). We also want click analytics — totals, a
+clicks-over-time chart, per-URL rankings, and later device/referrer breakdowns.
 
-Writing rich analytics synchronously inside the redirect would (a) add latency to every click, (b) couple availability of redirects to availability of the analytics store, and (c) make bursty traffic hammer the DB.
+Writing analytics synchronously in the redirect couples the hot path to the
+analytics store. Instead we treat a click as a **domain event** and apply CQRS:
+the redirect only *emits* the fact; a separate reader *projects* it into a query
+model.
 
-## Options
-
-**A. Synchronous DB insert on redirect.** Simple, but slow and fragile on the hot path. Rejected.
-
-**B. Laravel queue (database/Redis) job per click.** Decouples timing, but ties us to Laravel's queue semantics and doesn't give us a durable, replayable event log or an easy path to multiple independent consumers (e.g. real-time dashboards + batch rollups) in cloud.
-
-**C. Kafka event `url.clicked` + dedicated consumer (recommended).** The redirect **produces** a fact; one or more **consumers** react. Durable, replayable, horizontally scalable, and maps cleanly to MSK in Phase 2. Matches the stated stack (Kafka for event sourcing).
+The team runs on Windows where native PHP extensions are painful (we already
+swapped `phpredis` → `predis`). Getting `php-rdkafka` on the host is the friction
+point, so the backend is **containerised** for the Kafka runtime (chosen in the
+task discussion), while host dev uses a driver that needs no extension.
 
 ## Decision
 
-Adopt **Option C**.
+1. **Event:** `App\Events\UrlClicked` — an immutable fact (short_code, long_url,
+   occurred_at, ip, user_agent, referer), serialized as JSON.
+2. **Write side:** the redirect calls `ClickEventPublisherInterface::publish()`
+   **fire-and-forget**, wrapped in try/catch — a transport failure logs and the
+   302 still succeeds.
+3. **Transport is swappable via `CLICK_EVENT_DRIVER`:**
+   - `sync` — project inline in the request (host dev, no Kafka). Default.
+   - `kafka` — produce to topic `url.clicked`; the `clicks:consume` worker
+     projects asynchronously (Dockerised runtime with `ext-rdkafka`).
+   - `log` — discard to the log (load tests / analytics disabled).
+4. **Event store (write model):** append-only `click_events` table — the durable
+   log, kept in the **same SQL database** (no separate analytics DB in Phase 1).
+5. **Read model (query side):** `click_daily_aggregates` (+ `short_urls.click_count`),
+   written **only** by the `ClickProjector`. The dashboard reads this, never the
+   event log.
+6. **One projection path:** both `sync` and the Kafka consumer call the same
+   `ClickProjector`, so projection logic lives in exactly one place.
 
-- **Topic:** `url.clicked` (partitioned by short_code for ordering per link; tune partitions in Phase 2).
-- **Event payload (versioned):**
-  ```json
-  {
-    "version": 1,
-    "short_code": "b3Kf9Qx",
-    "occurred_at": "2026-01-01T12:00:00Z",
-    "ip": "203.0.113.4",
-    "user_agent": "Mozilla/5.0 ...",
-    "referer": "https://example.com"
-  }
-  ```
-- **Producer:** `KafkaClickProducer` behind an interface (`ClickEventPublisherInterface`), emitted **fire-and-forget** from `UrlRedirectService`. If produce fails → log + increment a failure metric, **never** break the redirect (302 still returns).
-- **Consumer:** `php artisan clicks:consume` worker. Enriches user-agent → `{browser, os, device_type}`, then persists to `clicks`. Handling is **idempotent** (safe to reprocess on replay).
-- **Local:** Redpanda (Kafka-API compatible, single container). **Cloud:** MSK.
+```
+GET /{code} ──▶ UrlRedirectService
+                  ├─ Redis cache (target)                    ← hot path
+                  └─ publisher.publish(UrlClicked)  (try/catch, fire-and-forget)
+                         │
+              sync ──────┤─────── kafka
+                         ▼                 ▼
+                  ClickProjector     topic: url.clicked ──▶ clicks:consume ──▶ ClickProjector
+                         │                                                          │
+                         ▼                                                          ▼
+        click_events (log) + click_daily_aggregates + short_urls.click_count  (read model)
+```
 
 ## Consequences
 
-- Redirect latency is bounded by Redis + a non-blocking produce, not by analytics writes.
-- Analytics can be scaled/replayed independently; new consumers (e.g. real-time counters) can be added without touching the hot path.
-- We accept **eventual consistency**: the dashboard reflects clicks a short time after they happen. The row's `click_count` gives an immediate coarse count; the `clicks` table gives the rich, slightly-delayed truth.
-- The event schema is a **contract**. Version it; additive changes only without a migration/consumer update.
-- Requires running a long-lived consumer process (a Compose service locally; a Deployment in K8s).
+**Good**
+- Redirect stays fast and resilient; analytics can lag or fail without user impact.
+- Host dev works with zero Kafka (`sync`); production faithfully uses Kafka.
+- The read model makes dashboard queries cheap (no scan of the event log).
+- The event log is replayable — new projections can be rebuilt from `click_events`.
+
+**Costs / follow-ups**
+- Eventual consistency under `kafka`: counts trail until the consumer catches up.
+- `ext-rdkafka` only exists in the Docker image (documented in `composer.json`
+  `suggest` and the Dockerfile).
+- Aggregates are per-day global; per-URL/day and device parsing are future
+  projections off the same event log.
+- A `/metrics` counter for published/consumed clicks is still owed (observability
+  roadmap item) — today we have structured logs (`click.publish.failed`).
+
+## How to run
+
+See [`docs/kafka-runbook.md`](../kafka-runbook.md).

@@ -6,6 +6,7 @@ import NotFound from '../components/common/NotFound';
 
 import GenerateUrlPage from '../features/shortUrls/GenerateUrlPage';
 import DashboardPage from '../features/shortUrls/DashboardPage';
+import ShortUrlsPage from '../features/shortUrls/ShortUrlsPage';
 import AccessCodesPage from '../features/accessCodes/AccessCodesPage';
 
 import LoginPage from '../features/auth/LoginPage';
@@ -41,7 +42,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'urls',
-            element: <DashboardPage />,
+            element: <ShortUrlsPage />,
           },
           {
             path: 'access-codes',

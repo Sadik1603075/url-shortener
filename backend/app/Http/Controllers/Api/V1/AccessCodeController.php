@@ -37,9 +37,9 @@ class AccessCodeController extends Controller
     {
         $accessCode = $this->service->generate(
             data: new CreateAccessCodeData(
-                email:       $request->validated('email'),
+                email: $request->validated('email'),
                 description: $request->validated('description'),
-                expiresAt:   $request->validated('expires_at'),
+                expiresAt: $request->validated('expires_at'),
             ),
             adminUserId: $request->user()->id,
         );

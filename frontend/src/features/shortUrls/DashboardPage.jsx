@@ -1,14 +1,39 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   Link2,
   MousePointerClick,
   Users,
   ShieldCheck,
-  BarChart3 
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
+
 import StatsCard from './components/StatsCard';
+import { useShortUrls } from './hooks';
+import { useOverview } from '../analytics/hooks';
+import ActivityChart from '../analytics/components/ActivityChart';
+import { formatNumber } from '../../lib/utils';
+
+const METRICS = {
+  clicks: { key: 'clicks_series', label: 'Clicks' },
+  created: { key: 'urls_created', label: 'Links created' },
+};
 
 export default function DashboardPage() {
+  const [days, setDays] = useState(30);
+  const [metric, setMetric] = useState('clicks');
+
+  const { data: overview, isLoading, isError } = useOverview(days);
+  const { data: recent } = useShortUrls({ per_page: 5 });
+
+  const totals = overview?.totals;
+  const recentLinks = recent?.data ?? [];
+  const topUrls = overview?.top_urls ?? [];
+  const maxTopClicks = Math.max(1, ...topUrls.map((u) => u.click_count));
+  const series = overview?.[METRICS[metric].key] ?? [];
+
   return (
     <div>
       <div className="page-header">
@@ -17,46 +42,51 @@ export default function DashboardPage() {
 
           <h1>Dashboard</h1>
 
-          <p>
-            Monitor your short links and access activity.
-          </p>
+          <p>Monitor your short links and access activity.</p>
         </div>
 
-        <a
-          href="/"
-          className="secondary-button"
-        >
+        <Link to="/" className="secondary-button">
           Create short URL
           <ArrowUpRight size={16} />
-        </a>
+        </Link>
       </div>
+
+      {isError && (
+        <div className="alert-error">
+          <AlertCircle size={15} />
+          Failed to load analytics.
+        </div>
+      )}
 
       <div className="stats-grid">
         <StatsCard
           title="Total URLs"
-          value="1,284"
-          change="+12.8%"
+          value={formatNumber(totals?.total_urls)}
           icon={Link2}
+          loading={isLoading}
         />
 
         <StatsCard
           title="Total clicks"
-          value="48,291"
-          change="+18.4%"
+          value={formatNumber(totals?.total_clicks)}
           icon={MousePointerClick}
+          loading={isLoading}
         />
 
         <StatsCard
           title="Active codes"
-          value="37"
-          change="+4.2%"
+          value={formatNumber(totals?.active_codes)}
+          hint={
+            totals ? `of ${formatNumber(totals.total_codes)} total` : undefined
+          }
           icon={Users}
+          loading={isLoading}
         />
 
         <StatsCard
           title="System status"
           value="Healthy"
-          change="99.99%"
+          change="Live"
           icon={ShieldCheck}
         />
       </div>
@@ -65,21 +95,44 @@ export default function DashboardPage() {
         <div className="panel large-panel">
           <div className="panel-header">
             <div>
-              <h2>URL activity</h2>
-              <p>Short-link usage over the last 30 days.</p>
+              <h2>Activity</h2>
+              <p>{METRICS[metric].label} over the selected window.</p>
             </div>
 
-            <select className="period-select">
-              <option>Last 30 days</option>
-              <option>Last 7 days</option>
-              <option>Last 90 days</option>
-            </select>
+            <div className="panel-controls">
+              <div className="metric-toggle">
+                {Object.entries(METRICS).map(([key, m]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={metric === key ? 'active' : ''}
+                    onClick={() => setMetric(key)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              <select
+                className="period-select"
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+              >
+                <option value={30}>Last 30 days</option>
+                <option value={7}>Last 7 days</option>
+                <option value={90}>Last 90 days</option>
+              </select>
+            </div>
           </div>
 
-          <div className="chart-placeholder">
-            <BarChart3 size={32} />
-            <span>Analytics visualization</span>
-          </div>
+          {isLoading ? (
+            <div className="chart-placeholder">
+              <Loader2 size={22} className="spin" />
+              <span>Loading activity…</span>
+            </div>
+          ) : (
+            <ActivityChart data={series} label={METRICS[metric].label} />
+          )}
         </div>
 
         <div className="panel">
@@ -90,26 +143,66 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="recent-list">
-            {[
-              ['zn9edcu', 'example.com/product'],
-              ['a82kLm9', 'company.com/report'],
-              ['xK82mLp', 'docs.example.com/api'],
-              ['Q7w8e9R', 'example.com/dashboard'],
-            ].map(([code, url]) => (
-              <div className="recent-item" key={code}>
-                <div className="recent-icon">
-                  <Link2 size={16} />
+          {recentLinks.length === 0 ? (
+            <div className="recent-empty">No links yet.</div>
+          ) : (
+            <div className="recent-list">
+              {recentLinks.map((link) => (
+                <div className="recent-item" key={link.id}>
+                  <div className="recent-icon">
+                    <Link2 size={16} />
+                  </div>
+
+                  <div className="recent-body">
+                    <strong>{link.short_code}</strong>
+                    <span>{link.long_url}</span>
+                  </div>
+
+                  <span className="recent-clicks">
+                    {formatNumber(link.click_count)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Top URLs by clicks</h2>
+            <p>Your most-visited short links.</p>
+          </div>
+        </div>
+
+        {topUrls.length === 0 ? (
+          <div className="recent-empty">No click data yet.</div>
+        ) : (
+          <div className="bar-list">
+            {topUrls.map((url) => (
+              <div className="bar-row" key={url.short_code}>
+                <div className="bar-label">
+                  <strong>{url.short_code}</strong>
+                  <span>{url.long_url}</span>
                 </div>
 
-                <div>
-                  <strong>{code}</strong>
-                  <span>{url}</span>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{
+                      width: `${(url.click_count / maxTopClicks) * 100}%`,
+                    }}
+                  />
                 </div>
+
+                <span className="bar-value">
+                  {formatNumber(url.click_count)}
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </section>
     </div>
   );

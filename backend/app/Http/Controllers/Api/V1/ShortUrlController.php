@@ -16,7 +16,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class ShortUrlController extends Controller
 {
     public function __construct(
-        private readonly ShortUrlService   $shortUrlService,
+        private readonly ShortUrlService $shortUrlService,
         private readonly AccessCodeService $accessCodeService,
     ) {}
 
@@ -38,7 +38,7 @@ class ShortUrlController extends Controller
         $shortUrl = $this->shortUrlService->create(
             userId: $userId,
             data: new CreateShortUrlData(
-                longUrl:   $request->validated('long_url'),
+                longUrl: $request->validated('long_url'),
                 expiresAt: $request->validated('expires_at'),
             ),
         );

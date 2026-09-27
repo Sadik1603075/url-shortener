@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\DTOs\Analytics\ClickContext;
 use App\Services\ShortUrl\UrlRedirectService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class RedirectController extends Controller
 {
@@ -11,8 +13,11 @@ class RedirectController extends Controller
         private readonly UrlRedirectService $service,
     ) {}
 
-    public function __invoke(string $shortCode): RedirectResponse
+    public function __invoke(Request $request, string $shortCode): RedirectResponse
     {
-        return $this->service->redirect($shortCode);
+        return $this->service->redirect(
+            $shortCode,
+            ClickContext::fromRequest($request),
+        );
     }
 }

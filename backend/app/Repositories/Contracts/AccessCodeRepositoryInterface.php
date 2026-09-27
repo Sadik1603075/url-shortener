@@ -19,6 +19,10 @@ interface AccessCodeRepositoryInterface
 
     public function findById(int $id): ?AccessCode;
 
+    public function totalCount(): int;
+
+    public function activeCount(): int;
+
     public function paginate(int $perPage = 15): LengthAwarePaginator;
 
     public function create(array $attributes): AccessCode;

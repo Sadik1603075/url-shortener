@@ -21,6 +21,9 @@
         "nunomaduro/collision": "^8.6",
         "phpunit/phpunit": "^12.5.12"
     },
+    "suggest": {
+        "ext-rdkafka": "Required only for CLICK_EVENT_DRIVER=kafka (produce/consume url.clicked). Installed in the Docker image; host dev uses the sync driver."
+    },
     "autoload": {
         "psr-4": {
             "App\\": "app/",

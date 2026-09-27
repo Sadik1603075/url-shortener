@@ -36,7 +36,7 @@ class ShortUrl extends Model
 
     public function isValid(): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 

@@ -2,7 +2,9 @@ export default function StatsCard({
   title,
   value,
   change,
+  hint,
   icon: Icon,
+  loading = false,
 }) {
   return (
     <div className="stats-card">
@@ -11,14 +13,16 @@ export default function StatsCard({
           <Icon size={19} />
         </div>
 
-        <span className="stats-change">
-          {change}
-        </span>
+        {change && <span className="stats-change">{change}</span>}
       </div>
 
       <span className="stats-title">{title}</span>
 
-      <strong className="stats-value">{value}</strong>
+      <strong className="stats-value">
+        {loading ? '—' : value}
+      </strong>
+
+      {hint && <span className="stats-hint">{hint}</span>}
     </div>
   );
 }

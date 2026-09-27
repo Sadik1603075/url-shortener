@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AccessCodeController;
+use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ShortUrlController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'admin'])
         ->prefix('admin')
         ->group(function () {
+
+            // Analytics
+            Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
 
             // Short URLs
             Route::get('/urls',          [ShortUrlController::class, 'index']);

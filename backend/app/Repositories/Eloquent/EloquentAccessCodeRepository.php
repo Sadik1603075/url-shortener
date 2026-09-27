@@ -47,6 +47,16 @@ class EloquentAccessCodeRepository implements AccessCodeRepositoryInterface
         return AccessCode::query()->find($id);
     }
 
+    public function totalCount(): int
+    {
+        return AccessCode::query()->count();
+    }
+
+    public function activeCount(): int
+    {
+        return AccessCode::query()->where('is_active', true)->count();
+    }
+
     public function paginate(int $perPage = 15): LengthAwarePaginator
     {
         return AccessCode::query()

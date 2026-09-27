@@ -1,0 +1,79 @@
+# LinkForge — local Phase-1 stack.
+#
+# SQL Server is expected to keep running on the Windows host (port 1433); the
+# containers reach it via host.docker.internal. Kafka, Redis, the API and the
+# click consumer all run here.
+#
+#   docker compose up -d --build
+#   docker compose logs -f clicks-worker
+#
+services:
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: linkforge-kafka
+    ports:
+      - "9092:9092"        # host clients → localhost:9092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: linkforge-kafka-ui
+    ports:
+      - "8080:8080"        # http://localhost:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: linkforge
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      - kafka
+
+  redis:
+    image: redis:7-alpine
+    container_name: linkforge-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ./backend
+    container_name: linkforge-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: host.docker.internal
+      REDIS_HOST: redis
+      CLICK_EVENT_DRIVER: kafka
+      KAFKA_BROKERS: kafka:29092
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - kafka
+      - redis
+
+  clicks-worker:
+    build: ./backend
+    container_name: linkforge-clicks-worker
+    command: ["php", "artisan", "clicks:consume"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: host.docker.internal
+      REDIS_HOST: redis
+      CLICK_EVENT_DRIVER: kafka
+      KAFKA_BROKERS: kafka:29092
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - kafka
+      - api
