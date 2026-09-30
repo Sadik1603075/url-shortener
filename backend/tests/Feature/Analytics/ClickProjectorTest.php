@@ -8,12 +8,12 @@ use App\Models\ClickDailyAggregate;
 use App\Models\ShortUrl;
 use App\Models\User;
 use App\Services\Analytics\AnalyticsService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class ClickProjectorTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private function projectClick(string $code): void
     {

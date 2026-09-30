@@ -15,8 +15,8 @@ class ShortUrlService
 {
     public function __construct(
         private readonly ShortUrlRepositoryInterface $repository,
-        private readonly ShortCodeGenerator          $codeGenerator,
-        private readonly ShortUrlCacheInterface      $cache,
+        private readonly ShortCodeGenerator $codeGenerator,
+        private readonly ShortUrlCacheInterface $cache,
     ) {}
 
     /**
@@ -28,9 +28,9 @@ class ShortUrlService
             $shortCode = $this->codeGenerator->generate();
 
             return $this->repository->create(
-                userId:    $userId,
+                userId: $userId,
                 shortCode: $shortCode,
-                longUrl:   $data->longUrl,
+                longUrl: $data->longUrl,
                 expiresAt: $data->expiresAt,
             );
         });
@@ -66,11 +66,18 @@ class ShortUrlService
     public function update(ShortUrl $shortUrl, UpdateShortUrlData $data): ShortUrl
     {
         return DB::transaction(function () use ($shortUrl, $data) {
+            // long_url / is_active are never null when supplied, so a null means
+            // "not supplied" and is filtered out.
             $attributes = array_filter([
-                'long_url'   => $data->longUrl,
-                'is_active'  => $data->isActive,
-                'expires_at' => $data->expiresAt,
+                'long_url' => $data->longUrl,
+                'is_active' => $data->isActive,
             ], fn ($v) => $v !== null);
+
+            // expires_at is nullable: include it whenever it was supplied, so a
+            // null clears the expiry (un-expire) rather than being ignored.
+            if ($data->expiresAtProvided) {
+                $attributes['expires_at'] = $data->expiresAt;
+            }
 
             $updated = $this->repository->update($shortUrl, $attributes);
 

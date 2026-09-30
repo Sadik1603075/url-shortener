@@ -7,12 +7,12 @@ use App\Events\UrlClicked;
 use App\Messaging\Contracts\ClickEventPublisherInterface;
 use App\Models\ShortUrl;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class RedirectResilienceTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {

@@ -51,6 +51,10 @@
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan cache:clear --ansi @no_additional_args",
+            "@php artisan route:clear --ansi @no_additional_args",
+            "@php artisan view:clear --ansi @no_additional_args",
+            "@php artisan optimize:clear --ansi @no_additional_args",
             "@php artisan test"
         ],
         "post-autoload-dump": [
