@@ -17,6 +17,12 @@ interface ClickAnalyticsRepositoryInterface
     public function incrementDaily(string $date, int $by = 1): void;
 
     /**
+     * Increment the device-breakdown read model for a (browser, os, device_type)
+     * bucket. Part of the device-enrichment projection (D5-T3).
+     */
+    public function incrementDevice(string $browser, string $os, string $deviceType, int $by = 1): void;
+
+    /**
      * Clicks per calendar day for the last $days days.
      *
      * @return array<string,int> keyed by Y-m-d
