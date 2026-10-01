@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Cache\Contracts\ShortUrlCacheInterface;
 use App\Cache\RedisShortUrlCache;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Support\Contracts\ShortCodeCounterInterface;
+use App\Support\DatabaseShortCodeCounter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,6 +17,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             ShortUrlCacheInterface::class,
             RedisShortUrlCache::class,
+        );
+
+        // Short-code counter source (ADR-0001)
+        $this->app->bind(
+            ShortCodeCounterInterface::class,
+            DatabaseShortCodeCounter::class,
         );
     }
 
