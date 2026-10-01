@@ -17,7 +17,7 @@ class AccessCodeService
 {
     public function __construct(
         private readonly AccessCodeRepositoryInterface $repository,
-        private readonly AccessCodeGenerator           $generator,
+        private readonly AccessCodeGenerator $generator,
     ) {}
 
     // -----------------------------------------------------------------------
@@ -57,7 +57,7 @@ class AccessCodeService
         $accessCode = $this->repository->findById($id);
 
         if ($accessCode === null) {
-            throw (new ModelNotFoundException())->setModel(AccessCode::class, [$id]);
+            throw (new ModelNotFoundException)->setModel(AccessCode::class, [$id]);
         }
 
         return $accessCode;
@@ -72,12 +72,12 @@ class AccessCodeService
         $code = $this->generator->generate();
 
         return $this->repository->create([
-            'user_id'     => $adminUserId,
-            'code'        => $code,
-            'email'       => $data->email,
+            'user_id' => $adminUserId,
+            'code' => $code,
+            'email' => $data->email,
             'description' => $data->description,
-            'is_active'   => true,
-            'expires_at'  => $data->expiresAt,
+            'is_active' => true,
+            'expires_at' => $data->expiresAt,
         ]);
     }
 
@@ -93,7 +93,9 @@ class AccessCodeService
             $attributes['is_active'] = $data->isActive;
         }
 
-        if ($data->expiresAt !== null) {
+        // expires_at is nullable: include it whenever it was supplied, so a null
+        // clears the expiry rather than being ignored.
+        if ($data->expiresAtProvided) {
             $attributes['expires_at'] = $data->expiresAt;
         }
 

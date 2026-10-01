@@ -156,6 +156,19 @@ class AccessCodeControllerTest extends TestCase
         $this->assertNotNull($fresh->expires_at);
     }
 
+    public function test_admin_can_clear_expiry_via_patch(): void
+    {
+        // Regression: sending expires_at=null must clear the expiry.
+        $this->actingAsAdmin();
+        $accessCode = AccessCode::factory()->create(['expires_at' => now()->addWeek()]);
+
+        $this->patchJson(self::BASE.'/'.$accessCode->id, ['expires_at' => null])
+            ->assertOk()
+            ->assertJsonPath('data.expires_at', null);
+
+        $this->assertNull($accessCode->fresh()->expires_at);
+    }
+
     public function test_update_returns_404_for_missing_code(): void
     {
         $this->actingAsAdmin();

@@ -85,6 +85,18 @@ class AccessCodeServiceTest extends TestCase
         $this->assertSame($updated, $result);
     }
 
+    public function test_update_clears_expires_at_when_explicitly_provided_as_null(): void
+    {
+        $accessCode = new AccessCode(['code' => 'USR-AAAA-BBBB']);
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->with($accessCode, ['expires_at' => null])
+            ->andReturn($accessCode);
+
+        $this->service->update($accessCode, new UpdateAccessCodeData(expiresAtProvided: true));
+    }
+
     public function test_update_is_a_noop_when_nothing_provided(): void
     {
         $accessCode = new AccessCode(['code' => 'USR-AAAA-BBBB']);

@@ -6,4 +6,10 @@ import { cleanup } from '@testing-library/react';
 
 afterEach(() => {
   cleanup();
+  // Isolate the auth store / anything using localStorage between tests.
+  try {
+    localStorage.clear();
+  } catch {
+    // ignore (storage unavailable)
+  }
 });
