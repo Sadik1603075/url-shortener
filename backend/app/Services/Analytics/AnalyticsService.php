@@ -41,7 +41,41 @@ class AnalyticsService
                 $days,
             ),
             'top_urls' => $this->topUrls(5),
+            'devices' => $this->deviceBreakdown(),
         ];
+    }
+
+    /**
+     * All-time device breakdown (by type / browser / os), each as rows sorted by
+     * clicks desc. Sourced from the `click_device_aggregates` read model (D5-T3).
+     *
+     * @return array{by_type: list<array{device_type: string, clicks: int}>, by_browser: list<array{browser: string, clicks: int}>, by_os: list<array{os: string, clicks: int}>}
+     */
+    private function deviceBreakdown(): array
+    {
+        $breakdown = $this->clicks->deviceBreakdown();
+
+        return [
+            'by_type' => $this->toRows($breakdown['by_type'] ?? [], 'device_type'),
+            'by_browser' => $this->toRows($breakdown['by_browser'] ?? [], 'browser'),
+            'by_os' => $this->toRows($breakdown['by_os'] ?? [], 'os'),
+        ];
+    }
+
+    /**
+     * @param  array<string,int>  $counts
+     * @return list<array<string,mixed>>
+     */
+    private function toRows(array $counts, string $key): array
+    {
+        arsort($counts);
+
+        $rows = [];
+        foreach ($counts as $label => $clicks) {
+            $rows[] = [$key => (string) $label, 'clicks' => (int) $clicks];
+        }
+
+        return $rows;
     }
 
     /**

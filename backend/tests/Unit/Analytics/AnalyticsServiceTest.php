@@ -59,6 +59,11 @@ class AnalyticsServiceTest extends TestCase
             new ShortUrl(['short_code' => 'aaa', 'long_url' => 'https://a.example.com', 'click_count' => 9]),
             new ShortUrl(['short_code' => 'bbb', 'long_url' => 'https://b.example.com', 'click_count' => 4]),
         ]));
+        $this->clicks->shouldReceive('deviceBreakdown')->once()->andReturn([
+            'by_type' => ['mobile' => 5, 'desktop' => 8],
+            'by_browser' => ['Chrome' => 10, 'Safari' => 3],
+            'by_os' => ['Windows' => 7, 'iOS' => 6],
+        ]);
 
         $overview = $this->service->overview(7);
 
@@ -90,5 +95,19 @@ class AnalyticsServiceTest extends TestCase
             ['short_code' => 'aaa', 'long_url' => 'https://a.example.com', 'click_count' => 9],
             ['short_code' => 'bbb', 'long_url' => 'https://b.example.com', 'click_count' => 4],
         ], $overview['top_urls']);
+
+        // Device breakdown: each group mapped to rows sorted by clicks desc.
+        $this->assertSame([
+            ['device_type' => 'desktop', 'clicks' => 8],
+            ['device_type' => 'mobile', 'clicks' => 5],
+        ], $overview['devices']['by_type']);
+        $this->assertSame([
+            ['browser' => 'Chrome', 'clicks' => 10],
+            ['browser' => 'Safari', 'clicks' => 3],
+        ], $overview['devices']['by_browser']);
+        $this->assertSame([
+            ['os' => 'Windows', 'clicks' => 7],
+            ['os' => 'iOS', 'clicks' => 6],
+        ], $overview['devices']['by_os']);
     }
 }

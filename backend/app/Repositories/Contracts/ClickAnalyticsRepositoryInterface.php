@@ -28,4 +28,11 @@ interface ClickAnalyticsRepositoryInterface
      * @return array<string,int> keyed by Y-m-d
      */
     public function clicksByDay(int $days): array;
+
+    /**
+     * All-time device breakdown from the device read model, grouped three ways.
+     *
+     * @return array{by_type: array<string,int>, by_browser: array<string,int>, by_os: array<string,int>}
+     */
+    public function deviceBreakdown(): array;
 }

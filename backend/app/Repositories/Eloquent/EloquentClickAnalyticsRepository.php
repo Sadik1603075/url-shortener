@@ -54,4 +54,29 @@ class EloquentClickAnalyticsRepository implements ClickAnalyticsRepositoryInterf
             ])
             ->toArray();
     }
+
+    public function deviceBreakdown(): array
+    {
+        return [
+            'by_type' => $this->sumClicksGroupedBy('device_type'),
+            'by_browser' => $this->sumClicksGroupedBy('browser'),
+            'by_os' => $this->sumClicksGroupedBy('os'),
+        ];
+    }
+
+    /**
+     * @return array<string,int> clicks summed per distinct value of $column
+     */
+    private function sumClicksGroupedBy(string $column): array
+    {
+        // $column is passed as a quoted identifier (never interpolated into raw
+        // SQL); only the SUM is raw. Callers pass literal column names.
+        return ClickDeviceAggregate::query()
+            ->groupBy($column)
+            ->selectRaw('SUM(clicks) as clicks')
+            ->addSelect($column)
+            ->pluck('clicks', $column)
+            ->map(fn ($clicks) => (int) $clicks)
+            ->toArray();
+    }
 }
