@@ -5,12 +5,15 @@ namespace Tests\Unit\ShortUrl;
 use App\Cache\Contracts\ShortUrlCacheInterface;
 use App\DTOs\Analytics\ClickContext;
 use App\Messaging\Contracts\ClickEventPublisherInterface;
+use App\Metrics\Metrics;
 use App\Models\ShortUrl;
 use App\Repositories\Contracts\ShortUrlRepositoryInterface;
 use App\Services\ShortUrl\UrlRedirectService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use Prometheus\CollectorRegistry;
+use Prometheus\Storage\InMemory;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
 
@@ -32,7 +35,10 @@ class UrlRedirectServiceTest extends TestCase
         $this->repository = Mockery::mock(ShortUrlRepositoryInterface::class);
         $this->publisher = Mockery::mock(ClickEventPublisherInterface::class);
 
-        $this->service = new UrlRedirectService($this->cache, $this->repository, $this->publisher);
+        // Real in-memory metrics recorder — harmless to the assertions below.
+        $metrics = new Metrics(new CollectorRegistry(new InMemory, false));
+
+        $this->service = new UrlRedirectService($this->cache, $this->repository, $this->publisher, $metrics);
     }
 
     private function context(): ClickContext
@@ -139,6 +145,7 @@ class UrlRedirectServiceTest extends TestCase
     public function test_redirect_survives_a_publisher_failure(): void
     {
         // Resilience: the hot path must never 500 because analytics is down.
+        Log::shouldReceive('withContext')->andReturnNull(); // redirect() stamps the short code
         Log::shouldReceive('warning')->once()->with('click.publish.failed', Mockery::type('array'));
 
         $this->cache->shouldReceive('get')->once()->andReturn('https://cached.example.com');

@@ -3,6 +3,7 @@
 namespace App\Messaging;
 
 use App\Events\UrlClicked;
+use App\Metrics\Metrics;
 use App\Repositories\Contracts\ClickAnalyticsRepositoryInterface;
 use App\Repositories\Contracts\ShortUrlRepositoryInterface;
 use App\Support\UserAgentParser;
@@ -25,6 +26,7 @@ class ClickProjector
     public function __construct(
         private readonly ClickAnalyticsRepositoryInterface $analytics,
         private readonly ShortUrlRepositoryInterface $shortUrls,
+        private readonly Metrics $metrics,
     ) {}
 
     public function project(UrlClicked $event): void
@@ -38,5 +40,8 @@ class ClickProjector
             $this->analytics->incrementDevice($device['browser'], $device['os'], $device['device_type']);
             $this->shortUrls->incrementClickCountByCode($event->shortCode);
         });
+
+        // Lag proxy: published (api) vs consumed (worker) under the Kafka driver.
+        $this->metrics->incClickConsumed();
     }
 }

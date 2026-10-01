@@ -1,0 +1,18 @@
+# Prometheus scrape config for LinkForge (ADR-0004).
+# The api serves /metrics; because metric storage is shared Redis, that single
+# endpoint also exposes counters written by the clicks-worker.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: linkforge-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: linkforge-api
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

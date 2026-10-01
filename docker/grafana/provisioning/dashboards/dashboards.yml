@@ -1,0 +1,12 @@
+# Auto-load dashboards from /var/lib/grafana/dashboards (ADR-0004).
+apiVersion: 1
+
+providers:
+  - name: LinkForge
+    orgId: 1
+    folder: LinkForge
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

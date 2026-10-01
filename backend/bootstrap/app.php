@@ -13,7 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Observability (ADR-0004): correlation id + per-request metrics.
+        $middleware->append(\App\Http\Middleware\AssignRequestId::class);
+        $middleware->append(\App\Http\Middleware\RecordHttpMetrics::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -63,6 +64,19 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+        ],
+
+        // Structured JSON to stdout (ADR-0004) — for containers. Carries the
+        // per-request context (request_id, actor) set by AssignRequestId.
+        'stdout' => [
+            'driver' => 'monolog',
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => 'php://stdout',
+            ],
+            'formatter' => JsonFormatter::class,
+            'processors' => [PsrLogMessageProcessor::class],
+            'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'daily' => [

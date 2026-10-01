@@ -2,42 +2,25 @@
 
 namespace Tests\Feature;
 
-use App\Cache\Contracts\ShortUrlCacheInterface;
 use App\Events\UrlClicked;
 use App\Messaging\Contracts\ClickEventPublisherInterface;
 use App\Models\ShortUrl;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Log;
+use Tests\Concerns\BindsInMemoryShortUrlCache;
 use Tests\TestCase;
 
 class RedirectResilienceTest extends TestCase
 {
+    use BindsInMemoryShortUrlCache;
     use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // In-memory cache so the redirect path never touches Redis in tests.
-        $this->app->singleton(ShortUrlCacheInterface::class, fn () => new class implements ShortUrlCacheInterface
-        {
-            private array $store = [];
-
-            public function get(string $shortCode): ?string
-            {
-                return $this->store[$shortCode] ?? null;
-            }
-
-            public function put(string $shortCode, string $longUrl, ?int $ttl = null): void
-            {
-                $this->store[$shortCode] = $longUrl;
-            }
-
-            public function forget(string $shortCode): void
-            {
-                unset($this->store[$shortCode]);
-            }
-        });
+        $this->bindInMemoryShortUrlCache();
     }
 
     private function makeUrl(string $code, string $long): void
@@ -51,10 +34,8 @@ class RedirectResilienceTest extends TestCase
         ]);
     }
 
-    public function test_redirect_still_302s_when_the_publisher_throws(): void
+    private function bindThrowingPublisher(): void
     {
-        $this->makeUrl('boom123', 'https://example.com/x');
-
         $this->app->bind(ClickEventPublisherInterface::class, fn () => new class implements ClickEventPublisherInterface
         {
             public function publish(UrlClicked $event): void
@@ -62,10 +43,43 @@ class RedirectResilienceTest extends TestCase
                 throw new \RuntimeException('kafka down');
             }
         });
+    }
+
+    public function test_redirect_still_302s_when_the_publisher_throws(): void
+    {
+        $this->makeUrl('boom123', 'https://example.com/x');
+        $this->bindThrowingPublisher();
 
         $this->get('/boom123')
             ->assertStatus(302)
             ->assertRedirect('https://example.com/x');
+    }
+
+    public function test_publisher_failure_is_logged(): void
+    {
+        Log::spy();
+        $this->makeUrl('boom124', 'https://example.com/x');
+        $this->bindThrowingPublisher();
+
+        $this->get('/boom124')->assertStatus(302);
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn ($message, $context = []) => $message === 'click.publish.failed'
+                && ($context['short_code'] ?? null) === 'boom124')
+            ->once();
+    }
+
+    public function test_publisher_failure_increments_the_metric(): void
+    {
+        $this->makeUrl('boom125', 'https://example.com/x');
+        $this->bindThrowingPublisher();
+
+        $this->get('/boom125')->assertStatus(302);
+
+        // The /metrics counter for publish failures (ADR-0004) reflects the degradation.
+        $body = $this->get('/metrics')->assertOk()->getContent();
+        // Anchored so "…_total 1" doesn't also match "…_total 10".
+        $this->assertMatchesRegularExpression('/^linkforge_click_publish_failures_total 1$/m', $body);
     }
 
     public function test_redirect_records_a_click_event_on_the_sync_driver(): void

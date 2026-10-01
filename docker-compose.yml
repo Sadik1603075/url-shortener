@@ -55,6 +55,10 @@ services:
       REDIS_HOST: redis
       CLICK_EVENT_DRIVER: kafka
       KAFKA_BROKERS: kafka:29092
+      # Observability (ADR-0004): shared Redis metric storage + JSON logs to stdout.
+      METRICS_STORAGE: redis
+      METRICS_REDIS_HOST: redis
+      LOG_STACK: single,stdout
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -72,8 +76,38 @@ services:
       REDIS_HOST: redis
       CLICK_EVENT_DRIVER: kafka
       KAFKA_BROKERS: kafka:29092
+      # Writes metrics to the SAME Redis the api scrapes, so one /metrics scrape
+      # sees consumer counters too (consumer-lag proxy).
+      METRICS_STORAGE: redis
+      METRICS_REDIS_HOST: redis
+      LOG_STACK: single,stdout
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - kafka
       - api
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: linkforge-prometheus
+    ports:
+      - "9090:9090"        # http://localhost:9090
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: linkforge-grafana
+    ports:
+      - "3000:3000"        # http://localhost:3000 (admin/admin)
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
