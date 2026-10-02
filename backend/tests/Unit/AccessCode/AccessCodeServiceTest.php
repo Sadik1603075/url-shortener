@@ -10,6 +10,7 @@ use App\Services\AccessCode\AccessCodeService;
 use App\Support\AccessCodeGenerator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use Tests\TestCase;
 
@@ -28,6 +29,27 @@ class AccessCodeServiceTest extends TestCase
         $this->repository = Mockery::mock(AccessCodeRepositoryInterface::class);
         $this->generator = Mockery::mock(AccessCodeGenerator::class);
         $this->service = new AccessCodeService($this->repository, $this->generator);
+    }
+
+    public function test_validate_and_consume_returns_owner_id_and_marks_used(): void
+    {
+        $accessCode = new AccessCode(['user_id' => 5, 'code' => 'GOOD']);
+
+        $this->repository->shouldReceive('findValidCode')->once()->with('GOOD')->andReturn($accessCode);
+        $this->repository->shouldReceive('markUsed')->once()->with($accessCode);
+
+        $this->assertSame(5, $this->service->validateAndConsume('GOOD'));
+    }
+
+    public function test_validate_and_consume_rejects_an_invalid_or_expired_code(): void
+    {
+        // The gate must fail closed: null from the repo → ValidationException, and
+        // the code is NOT marked used (strict mock has no markUsed expectation).
+        $this->repository->shouldReceive('findValidCode')->once()->with('BAD')->andReturnNull();
+
+        $this->expectException(ValidationException::class);
+
+        $this->service->validateAndConsume('BAD');
     }
 
     public function test_generate_builds_an_active_code_and_delegates_to_the_repository(): void

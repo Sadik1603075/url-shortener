@@ -3,10 +3,15 @@
 Start here. These docs exist so you can regain context without re-reading the codebase.
 
 ## Cross-cutting
-- **[roadmap.md](roadmap.md)** — the 10-day plan + task checklist (source of truth for what's next/done).
+- **[local-setup.md](local-setup.md)** — run everything locally (start here to boot the stack).
+- **[roadmap.md](roadmap.md)** — the 10-day plan (source of truth for what's next/done); normalized tickets in [tickets.md](tickets.md), ground-truth scan in [task-checklist.md](task-checklist.md).
 - [architecture/system-overview.md](architecture/system-overview.md) — components, request flows, data model, local↔cloud parity.
-- [adr/0001-base62-non-enumerable-codes.md](adr/0001-base62-non-enumerable-codes.md) — short-code design decision.
+- [architecture/observability.md](architecture/observability.md) — metrics, dashboards, structured logs, alerts.
+- [load-testing.md](load-testing.md) — JMeter plans ([`load/`](../load/)) + performance baseline.
+- [adr/0001-base62-non-enumerable-codes.md](adr/0001-base62-non-enumerable-codes.md) — short-code design.
 - [adr/0002-kafka-event-analytics.md](adr/0002-kafka-event-analytics.md) — click analytics via Kafka.
+- [adr/0003-database-engine.md](adr/0003-database-engine.md) — host SQL Server (Phase 1).
+- [adr/0004-observability.md](adr/0004-observability.md) — Prometheus + Grafana + structured logs.
 
 ## Backend (`../backend/docs/`)
 - `architecture.md` — layers + request lifecycles.

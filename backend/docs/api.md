@@ -44,12 +44,16 @@ Cached in Redis; emits `UrlClicked` (🚧 D4).
 | PATCH | `/admin/access-codes/{id}` | `{is_active?, expires_at?}` | `{data: AccessCode}` |
 | DELETE | `/admin/access-codes/{id}` | — | `204` |
 
-## Admin — Analytics 🚧 D5/D7
+## Admin — Analytics
 | Method | Path | Response |
 |---|---|---|
-| GET | `/admin/analytics/summary` | totals, clicks over time |
-| GET | `/admin/analytics/devices` | breakdown by browser/os/device |
-| GET | `/admin/analytics/top-urls` | most-clicked short URLs |
+| GET | `/admin/analytics/overview?days=7..90` | `{data: {totals, urls_created[], clicks_series[], top_urls[], devices}}` |
+
+A single `overview` call feeds the whole dashboard (one fetch). `data.devices` is
+`{by_type[], by_browser[], by_os[]}`, each a list of `{<dimension>, clicks}` rows sorted
+by clicks desc (all-time; the `days` window governs only `clicks_series`/`urls_created`).
+`top_urls` are the 5 most-clicked short URLs. _(Implemented D5-T4; no separate
+`/devices` or `/top-urls` routes — they're folded into `overview`.)_
 
 ## Resource shapes
 **ShortUrl**: `id, short_code, short_url, long_url, is_active, click_count, expires_at, last_accessed_at, created_at, updated_at, user?`
