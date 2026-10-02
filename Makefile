@@ -5,9 +5,12 @@
 # server process survives `down`/`fresh`, but note `fresh` WIPES its schema/data.
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs fresh test test-backend test-frontend migrate
+.PHONY: help up down logs fresh test test-backend test-frontend migrate \
+        k8s-up k8s-build k8s-deploy k8s-migrate k8s-restart k8s-status k8s-down
 
 COMPOSE := docker compose
+K8S_OVERLAY := infra/k8s/overlays/local
+K8S_NS := linkforge
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -41,3 +44,30 @@ test-backend: ## Run the backend PHPUnit suite
 
 test-frontend: ## Run the frontend Vitest suite
 	cd frontend && npm test
+
+# --- Local Kubernetes (minikube) — Phase 1.5, ADR-0005 ----------------------
+
+k8s-up: ## Start minikube with the ingress + metrics-server addons (NetworkPolicy: add --cni=calico)
+	minikube start --addons=ingress,metrics-server
+
+k8s-build: ## Build the api + frontend images straight into minikube
+	minikube image build -t linkforge/api:local ./backend
+	minikube image build -t linkforge/frontend:local ./frontend
+
+k8s-deploy: ## Apply the local overlay, then run the migration Job
+	kubectl apply -k $(K8S_OVERLAY)
+	$(MAKE) k8s-migrate
+
+k8s-migrate: ## (Re)run the DB migration Job
+	kubectl delete job migrate -n $(K8S_NS) --ignore-not-found
+	kubectl apply -f infra/k8s/jobs/migrate.job.yaml
+	kubectl wait --for=condition=complete job/migrate -n $(K8S_NS) --timeout=120s
+
+k8s-restart: ## Roll all Deployments (pick up config/secret changes — names are stable)
+	kubectl rollout restart deploy -n $(K8S_NS)
+
+k8s-status: ## Show pods, services, HPA
+	kubectl get pods,svc,hpa,ingress -n $(K8S_NS)
+
+k8s-down: ## Delete the linkforge namespace (keep the cluster)
+	kubectl delete -k $(K8S_OVERLAY) --ignore-not-found

@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# All resources land in the linkforge namespace.
+namespace: linkforge
+
+# Org-wide labels on every object (not injected into selectors, so adding/removing
+# them later never breaks a Deployment's immutable selector — each workload owns its
+# own selector labels).
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: linkforge
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - api.yaml          # K8S-5
+  - worker.yaml       # K8S-6
+  - frontend.yaml     # K8S-8
+  - hpa.yaml          # K8S-10
+  - pdb.yaml          # K8S-12
+  # Overlay adds local-only infra (redis/kafka), ingress, observability, netpol.
+  # The migration Job (K8S-7) is applied separately (see infra/k8s/jobs) — a Job
+  # spec is immutable, so it must not ride in `apply -k`.
+
+# Env-agnostic app config. Per-env values + secrets come from the overlay.
+# Stable names (no hash suffix) so Deployments/Jobs reference them by name and
+# `apply -k` is idempotent. Re-roll pods after a config change with
+# `kubectl rollout restart deploy -n linkforge` (or `make k8s-restart`).
+configMapGenerator:
+  - name: linkforge-config
+    envs:
+      - config/app.env
+
+generatorOptions:
+  disableNameSuffixHash: true

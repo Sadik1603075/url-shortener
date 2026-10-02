@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - redis.yaml            # local in-cluster cache + metric storage (cloud → ElastiCache)
+  - kafka.yaml            # local in-cluster broker (cloud → MSK)
+  - ingress.yaml          # K8S-9
+  - networkpolicy.yaml    # K8S-12
+  - observability.yaml    # K8S-11 (Prometheus + Grafana)
+
+# Mark everything in this overlay as the local environment.
+labels:
+  - pairs:
+      app.kubernetes.io/environment: local
+    includeSelectors: false
+
+# Stable generated names (idempotent apply; Jobs/Deployments reference by name).
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  # Per-env overrides merged into the base ConfigMap (endpoints, APP_URL, debug).
+  - name: linkforge-config
+    behavior: merge
+    envs:
+      - config/app.local.env
+  # Observability config (K8S-11).
+  - name: prometheus-config
+    files:
+      - observability/prometheus.yml
+  - name: grafana-datasources
+    files:
+      - observability/grafana-datasource.yml
+  - name: grafana-dashboard-provider
+    files:
+      - observability/grafana-dashboard-provider.yml
+  - name: grafana-dashboards
+    files:
+      - observability/linkforge-dashboard.json
+
+# Secrets from a gitignored file (copy .env.k8s.local.example → .env.k8s.local).
+secretGenerator:
+  - name: linkforge-secrets
+    envs:
+      - .env.k8s.local
+
+# Images are built into minikube with the `local` tag (see `make k8s-build`):
+images:
+  - name: linkforge/api
+    newTag: local
+  - name: linkforge/frontend
+    newTag: local

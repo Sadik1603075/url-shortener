@@ -1,0 +1,45 @@
+# clicks-worker — Kafka consumer that projects click events (K8S-6).
+# Not CPU-autoscaled: throughput is bounded by Kafka partitions, not pod CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clicks-worker
+  labels:
+    app.kubernetes.io/name: clicks-worker
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clicks-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clicks-worker
+        app.kubernetes.io/component: worker
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: clicks-worker
+          image: linkforge/api:local
+          imagePullPolicy: IfNotPresent
+          command: ["php", "artisan", "clicks:consume"]
+          envFrom:
+            - configMapRef:
+                name: linkforge-config
+            - secretRef:
+                name: linkforge-secrets
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f clicks:consume"]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi

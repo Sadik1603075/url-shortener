@@ -1,0 +1,47 @@
+# Ingress (K8S-9). Two hosts keep short-code redirects (which live at "/") from
+# colliding with the SPA's client-side routes:
+#   app.linkforge.local  → SPA at /, with /api + /metrics routed to the api
+#                          (same origin, so the SPA's relative /api/v1 base works — no CORS)
+#   linkforge.local      → api at / (public short-URL redirects + /api + /metrics)
+# nginx-ingress matches the longest path prefix first, so /api and /metrics win over /.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: linkforge
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.linkforge.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+    - host: linkforge.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000

@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Metric storage is shared Redis, so scraping the api Service (any pod) returns the
+# full aggregate — no per-pod discovery needed for Phase 1.5.
+scrape_configs:
+  - job_name: linkforge-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: linkforge-api
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -7,11 +7,13 @@ Start here. These docs exist so you can regain context without re-reading the co
 - **[roadmap.md](roadmap.md)** — the 10-day plan (source of truth for what's next/done); normalized tickets in [tickets.md](tickets.md), ground-truth scan in [task-checklist.md](task-checklist.md).
 - [architecture/system-overview.md](architecture/system-overview.md) — components, request flows, data model, local↔cloud parity.
 - [architecture/observability.md](architecture/observability.md) — metrics, dashboards, structured logs, alerts.
-- [load-testing.md](load-testing.md) — JMeter plans ([`load/`](../load/)) + performance baseline.
+- [load-testing.md](load-testing.md) — JMeter plans ([`load/`](../load/)) + performance baseline + HPA proof.
+- [k8s-local.md](k8s-local.md) — run on local Kubernetes (minikube); manifests in [`infra/k8s/`](../infra/k8s/).
 - [adr/0001-base62-non-enumerable-codes.md](adr/0001-base62-non-enumerable-codes.md) — short-code design.
 - [adr/0002-kafka-event-analytics.md](adr/0002-kafka-event-analytics.md) — click analytics via Kafka.
 - [adr/0003-database-engine.md](adr/0003-database-engine.md) — host SQL Server (Phase 1).
 - [adr/0004-observability.md](adr/0004-observability.md) — Prometheus + Grafana + structured logs.
+- [adr/0005-local-kubernetes-topology.md](adr/0005-local-kubernetes-topology.md) — local k8s (minikube) topology & tooling.
 
 ## Backend (`../backend/docs/`)
 - `architecture.md` — layers + request lifecycles.

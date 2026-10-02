@@ -1,0 +1,2 @@
+# Real local secrets — never commit (only the .example is tracked).
+.env.k8s.local
