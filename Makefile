@@ -54,7 +54,7 @@ k8s-build: ## Build the api + frontend images straight into minikube
 	minikube image build -t linkforge/api:local ./backend
 	minikube image build -t linkforge/frontend:local ./frontend
 
-k8s-deploy: ## Apply the local overlay, then run the migration Job
+k8s-deploy: k8s-build ## Build images, apply the local overlay, then run the migration Job
 	kubectl apply -k $(K8S_OVERLAY)
 	$(MAKE) k8s-migrate
 
