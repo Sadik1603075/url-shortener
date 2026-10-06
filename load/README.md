@@ -25,14 +25,15 @@ record the baseline in [`docs/load-testing.md`](../docs/load-testing.md).
 
 ## Parameters (all have defaults; override with `-Jname=value`)
 
-`host` (127.0.0.1) · `port` (8000) · `protocol` (http) · `threads` · `rampup` (s) ·
+`host` (127.0.0.1) · `port` (8000) · `protocol` (http) · `host_header` (empty — set to
+`linkforge.local` when targeting a k8s ingress) · `threads` · `rampup` (s) ·
 `duration` (s). Plan-specific: `code` (redirect), `access_code` (create),
 `email`/`password` (admin).
 
 ## Run headless
 
 ```bash
-# from repo root
+# from repo root — direct (php artisan serve / Docker Compose)
 jmeter -n -t load/redirect-throughput.jmx -Jcode=ABC1234 -Jthreads=50 -Jduration=60 \
        -l out/redirect.jtl -e -o out/redirect-report
 
@@ -41,6 +42,11 @@ jmeter -n -t load/create-with-code.jmx -Jaccess_code=DEV-ACCESS-001 -Jthreads=20
 
 jmeter -n -t load/admin-login-list.jmx -Jemail=dev@example.com -Jpassword=password -Jthreads=10 -Jduration=60 \
        -l out/admin.jtl -e -o out/admin-report
+
+# via minikube ingress (port-forwarded)
+jmeter -n -t load/redirect-throughput.jmx -Jhost=127.0.0.1 -Jport=8090 \
+       -Jhost_header=linkforge.local -Jcode=ABC1234 -Jthreads=20 -Jduration=60 \
+       -l out/redirect.jtl -e -o out/redirect-report
 ```
 
 - `-n` headless, `-t` plan, `-l` raw results (JTL), `-e -o <dir>` HTML dashboard.

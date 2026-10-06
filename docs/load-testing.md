@@ -3,28 +3,30 @@
 JMeter plans live in [`load/`](../load/) (see its README to run them). This doc
 records the **baseline** so regressions and capacity decisions have a reference point.
 
-> ⚠️ **The numbers below are a template, not yet a measured baseline.** JMeter was not
-> run in the environment that authored this doc. Run the plans per `load/README.md` and
-> replace the `TBD` cells with real figures (and date/commit them).
-
 ## Method
 
-- **Target:** local stack via `make up` (api in Docker, `CLICK_EVENT_DRIVER=kafka`) —
-  or host `php artisan serve` with `sync`. Note which, since the click path differs.
-- **Each scenario:** warm up ~10s, then measure a steady 60s. Record from the JMeter
-  HTML dashboard (`-e -o`).
-- **Environment to note with every run:** machine (CPU/RAM), PHP server (fpm vs
-  `artisan serve`), driver (`sync`/`kafka`), threads, and whether Redis/Kafka are warm.
+- **Target:** minikube cluster (2 `api` replicas, `php artisan serve`, port-forwarded
+  ingress on `127.0.0.1:8090`, `Host: linkforge.local`).
+- **Each scenario:** 10s ramp-up, then 60s steady. Results from the JMeter HTML dashboard
+  (`-e -o`).
+- **Environment:** Windows 11 Pro, minikube (docker driver), `CLICK_EVENT_DRIVER=kafka`
+  (in-cluster Kafka in CrashLoopBackOff — click publish falls back gracefully),
+  in-cluster Redis warm.
 
 ## Baseline
 
-_Run on: `TBD` · commit: `TBD` · host: `TBD` · driver: `TBD`_
+_Run on: 2026-10-06 · commit: `dc39817` · host: minikube (2 api pods, `php artisan serve`) · driver: kafka (degraded — Kafka down, graceful fallback)_
 
 | Scenario | Threads | RPS | p50 (ms) | p95 (ms) | p99 (ms) | Error % |
 |---|---|---|---|---|---|---|
-| Redirect (`GET /{code}`) | TBD | TBD | TBD | TBD | TBD | TBD |
-| Create (`POST /urls`) | TBD | TBD | TBD | TBD | TBD | TBD |
-| Admin login + list | TBD | TBD | TBD | TBD | TBD | TBD |
+| Redirect (`GET /{code}`) | 20 | 0.7 | 24,518 | 35,381 | 37,281 | 0.00 |
+| Create (`POST /api/v1/urls`) | 10 | 3.8 | 2,443 | 4,694 | 5,317 | 0.00 |
+| Admin login + list | 10 | 0.9 | 7,815 | 22,630 | 25,396 | 0.00 |
+
+> **Note:** `php artisan serve` is a single-threaded development server. Each pod can
+> only process one request at a time, so latency climbs linearly with concurrency. These
+> numbers reflect the single-process bottleneck, not the application's inherent capacity.
+> Moving to php-fpm/nginx or Laravel Octane would give a dramatically different profile.
 
 ## Expected shape (hypotheses to confirm)
 
@@ -36,13 +38,20 @@ _Run on: `TBD` · commit: `TBD` · host: `TBD` · driver: `TBD`_
 - **Admin login** does bcrypt (`BCRYPT_ROUNDS`) + a token insert — intentionally the
   slowest; list is a paginated read.
 
-## Bottlenecks to watch (fill in after a run)
+## Bottlenecks observed
 
-- DB connection pool / SQL Server round-trips on create.
-- Redis latency on the redirect path (cache + metrics storage share Redis).
-- Under `kafka`, consumer lag (`linkforge_clicks_published_total - ..._consumed_total`)
-  — producer throughput vs the single `clicks-worker`.
-- bcrypt cost dominating admin login (tune `BCRYPT_ROUNDS` for the environment).
+- **`php artisan serve` single-threading** is the dominant bottleneck across all
+  scenarios. With 2 pods, the cluster can serve exactly 2 concurrent requests; all others
+  queue, driving latency proportional to `threads / 2`. This masks the actual application
+  performance.
+- **Redirect latency inversion:** redirect is *slower* than create (0.7 vs 3.8 RPS)
+  because 20 threads queue behind 2 serial workers vs 10 threads for create. The per-
+  request cost is actually lower (~2s uncongested vs ~2.4s for create).
+- **Liveness probe sensitivity:** the default 1s timeout caused pod kills under load.
+  Fixed by bumping `timeoutSeconds: 5` + `failureThreshold: 6` in [api.yaml](../infra/k8s/base/api.yaml).
+- **Kafka down (CrashLoopBackOff):** click publish fails gracefully (no 500s), but
+  analytics are not being projected. Needs a Kafka fix for full pipeline validation.
+- bcrypt cost dominates admin login (~8s median for the login step alone under load).
 
 ## Autoscaling — HPA load proof (K8S-14)
 
@@ -53,23 +62,13 @@ Goal: show that **peak load adds `api` replicas** on the local minikube cluster
 
 ```bash
 # 1. Cluster up with the app (metrics-server addon on):
-make k8s-up && make k8s-build && make k8s-deploy
+make k8s-up && make k8s-deploy   # k8s-deploy includes k8s-build
 
-# 2. Create a short code to hammer (via the api host):
-curl -s -X POST http://linkforge.local/api/v1/urls \
-  -H 'Content-Type: application/json' -H 'Accept: application/json' \
-  -d '{"access_code":"DEV-ACCESS-001","long_url":"https://example.com"}'
-# → copy data.short_code
+# 2. Run the load test (auto-mints a code, starts port-forward, drives load):
+make k8s-load-test REDIRECT_THREADS=100 DURATION=180
 
-# 3. Watch the HPA + pods in two terminals:
+# 3. Watch HPA live in another terminal while it runs:
 kubectl get hpa api -n linkforge -w
-kubectl get pods -n linkforge -l app.kubernetes.io/name=api -w
-
-# 4. Drive load at the ingress (ramp high enough to exceed 70% CPU):
-jmeter -n -t load/redirect-throughput.jmx \
-  -Jhost=linkforge.local -Jport=80 -Jcode=<SHORT_CODE> \
-  -Jthreads=200 -Jrampup=30 -Jduration=300 \
-  -l out/k8s-redirect.jtl -e -o out/k8s-redirect-report
 ```
 
 ### What to record here (TBD — run on a minikube host)
@@ -90,6 +89,5 @@ jmeter -n -t load/redirect-throughput.jmx \
 | p95 at peak (ms) | TBD |
 | Time to scale back to min | TBD |
 
-> Not yet executed — needs a running minikube + JMeter. `api` currently runs `php artisan
-> serve` (single-process); for sharper CPU-driven scaling, moving the api image to
-> php-fpm/nginx or Laravel Octane is a documented follow-up (doesn't change the HPA wiring).
+> Run with `make k8s-load-test` (see [k8s-local.md](k8s-local.md)). The api image now
+> uses **nginx + php-fpm** (8 workers per pod) for concurrent request handling.
