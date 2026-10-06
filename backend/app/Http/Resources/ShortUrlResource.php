@@ -15,7 +15,7 @@ class ShortUrlResource extends JsonResource
         return [
             'id'               => $this->id,
             'short_code'       => $this->short_code,
-            'short_url'        => url("/{$this->short_code}"),
+            'short_url'        => config('shortcode.url_base')."/{$this->short_code}",
             'long_url'         => $this->long_url,
             'is_active'        => $this->is_active,
             'click_count'      => $this->click_count,

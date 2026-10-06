@@ -13,7 +13,7 @@
 | Phase | Scope | State |
 |---|---|---|
 | Phase 0 | Existing scaffold (models, repos, services, DTOs, API controllers, resources, routes, FE structure) | **Mostly complete** — see "Already in place" |
-| **Phase 1** | **Full system running locally + tested + load-tested (Days 1–10)** | **Not started** |
+| **Phase 1** | **Full system running locally + tested + load-tested (Days 1–10)** | **In progress** — click event pipeline (ADR-0002) + Compose stack already landed ahead of the linear day order; see `docs/plan-understanding.md` §6 |
 | Phase 2 | AWS: Terraform, EKS/K8s, Jenkins, managed services | Backlog (do not start until Phase 1 signed off) |
 
 ### Already in place (Phase 0 — verified)
@@ -21,15 +21,22 @@
 - DTOs: `CreateShortUrlData`, `UpdateShortUrlData`, `LoginData`. Enum: `UserRole`.
 - HTTP: `Api/V1/AuthController`, `Api/V1/ShortUrlController`, `RedirectController`; FormRequests; `ShortUrlResource`, `UserResource`; `EnsureUserIsAdmin` middleware; `api.php` + `web.php` routes wired.
 - Redis cache abstraction (`ShortUrlCacheInterface` → `RedisShortUrlCache`).
-- `ShortCodeGenerator` (currently **random** base62 — to be revisited in D2-T1 per ADR-0001).
+- `ShortCodeGenerator` — **counter + keyed Feistel → base62** (ADR-0001, implemented at D2); no longer random/collision-checked.
 - Models: `User` (role), `ShortUrl`, `AccessCode` + migrations.
 - Frontend scaffold: `app/` (router, providers), `lib/` (apiClient, queryClient), feature folders (empty), `.env`.
+- **Click event sourcing (ADR-0002, implemented):** `UrlClicked` event; `Sync`/`Log`/`Kafka` click-event publishers behind `ClickEventPublisherInterface`; `ClickProjector`; `AnalyticsService`; `clicks:consume` worker (`ConsumeClicks`); `click_events` + `click_daily_aggregates` migrations; `CLICK_EVENT_DRIVER` config.
+- **Local Compose stack:** root `docker-compose.yml` + `backend/Dockerfile` running `kafka` (apache/kafka 3.8 KRaft), `kafka-ui`, `redis`, `api`, `clicks-worker`. (DB = SQL Server on the Windows host via `host.docker.internal`.)
 
-### Decisions to confirm before/at the relevant task 🔒
-1. **DB engine.** Current `.env` uses **SQL Server (`sqlsrv`)**. For cloud we'd typically use **RDS Postgres/MySQL**. Recommend standardising on **Postgres** for parity with common EKS setups + easy local container. → confirm at **D1-T2**.
-2. **Base62 generation strategy.** Random-collision-checked (current) vs counter + reversible obfuscation (Feistel/multiplier). ADR-0001 recommends **counter + keyed obfuscation** for guaranteed uniqueness *and* non-enumerability. → confirm at **D2-T1**.
-3. **Kafka distribution.** Confluent images vs Bitnami vs Redpanda for local. Recommend **Redpanda** locally (single binary, Kafka-API compatible, light) and **MSK** in cloud. → confirm at **D4-T1**.
-4. **Analytics store.** Same SQL DB (separate schema/tables) vs dedicated store. Recommend **same DB, dedicated `clicks` + aggregate tables** for Phase 1. → confirm at **D5-T1**.
+### Decisions
+
+**Still open 🔒**
+- _(none)_
+
+**Resolved ✅ (recorded here so they aren't re-litigated)**
+2. **Base62 generation strategy → counter + keyed obfuscation (ADR-0001 Accepted, D2).** `ShortCodeGenerator` now does `counter.next()` → 4-round keyed Feistel → `Base62`, padded to `SHORTCODE_MIN_LENGTH`. Unique + non-enumerable + no collision lookup. Counter via `short_code_counters` table.
+1. **DB engine → host SQL Server (ADR-0003).** Accept **SQL Server (`sqlsrv`) on the host** for Phase 1 (reached from containers via `host.docker.internal`, no containerised `db`). Cloud (Phase 2) provisions an **SQL Server instance via Terraform** — same engine end to end, no Postgres swap. `.env.example` made coherent (`sqlsrv`, `REDIS_CLIENT=predis`).
+3. **Kafka distribution.** ~~Redpanda recommended~~ → shipped **`apache/kafka:3.8.0` (KRaft)** + `kafka-ui` in Compose; **MSK** planned for cloud.
+4. **Analytics store.** ~~Flat `clicks` table~~ → resolved by **ADR-0002**: event-sourced **`click_events` (log) + `click_daily_aggregates` (read model)** in the **same SQL DB**; device enrichment deferred to a future projection.
 
 ---
 
@@ -37,19 +44,19 @@
 
 ### Day 1 — Local environment & tooling foundation
 Goal: `docker compose up` brings the whole topology online; test runners exist on both sides.
-- [ ] **D1-T1** Root `docker-compose.yml` skeleton + `Makefile` (`make up/down/logs/test/fresh`). Services stubbed: `api`, `frontend`, `db`, `redis`. *(kafka/prometheus/grafana added in their days.)*
-- [ ] **D1-T2** Choose + wire DB engine (🔒 decision 1). Containerise DB, update `.env.example`, verify `php artisan migrate` against the container.
+- [x] **D1-T1** Root `docker-compose.yml` + `Makefile` (`make up/down/logs/test/fresh`). *Compose runs `api`, `redis`, `kafka`, `kafka-ui`, `clicks-worker`, `prometheus`, `grafana` (no `frontend`/`db` service — DB is host SQL Server). `Makefile` added (D1-T1b).*
+- [x] **D1-T2** Choose + wire DB engine (decision 1 → **ADR-0003**). *Accepted host SQL Server (`sqlsrv`); no containerised `db`. `.env.example` made coherent (`sqlsrv`, `REDIS_CLIENT=predis`). Verified: `migrate:status` → all 10 migrations Ran; `composer test` green (6/6). Cloud DB = Terraform-provisioned SQL Server (Phase 2).*
 - [ ] **D1-T3** Backend test harness: confirm PHPUnit config, add `Tests\TestCase` base, a `RefreshDatabase` example test, CI-friendly `composer test`.
-- [ ] **D1-T4** Frontend test harness: add **Vitest + React Testing Library + jsdom**, `npm test` script, one smoke test.
-- [ ] **D1-T5** `docs/local-setup.md`: how to run everything locally, ports, seeded admin creds.
+- [x] **D1-T4** Frontend test harness: **Vitest 5 + RTL 16 + jsdom 30** + jest-dom; `test`/`test:watch` scripts; `test` block in `vite.config.js` (jsdom, globals, `src/test/setup.js`); smoke test renders `<Logo />`. *`npm test` green (1/1).*
+- [x] **D1-T5** `docs/local-setup.md`: run-everything-locally guide — prereqs, DB (dev + test) setup, Docker (`make up`) / host-dev paths, ports, seeded admin, `CLICK_EVENT_DRIVER`, observability, tests, self-review checklist.
 - **Tests this day:** backend RefreshDatabase smoke; frontend render smoke.
 
 ### Day 2 — Core domain: base62 short codes
 Goal: correct, non-enumerable short-code generation with full unit coverage.
-- [ ] **D2-T1** ADR-0001 confirmed; implement `Support/Base62` codec (encode/decode, tested against known vectors).
-- [ ] **D2-T2** Short-code counter strategy (sequence/table) + keyed obfuscation; refactor `ShortCodeGenerator` to use it behind the existing interface (no controller/service signature change).
-- [ ] **D2-T3** Collision & length invariants; property tests (encode∘decode round-trip, no code shorter than min length, alphabet-only).
-- **Tests:** `Base62Test`, `ShortCodeGeneratorTest` (unit).
+- [x] **D2-T1** ADR-0001 confirmed (Accepted); `Support/Base62` codec (encode/decode) with known-vector + round-trip tests.
+- [x] **D2-T2** Counter (`short_code_counters` table + `ShortCodeCounterInterface`/`DatabaseShortCodeCounter`) + keyed 4-round Feistel; `ShortCodeGenerator` refactored behind its existing `generate()` seam (no controller/service change).
+- [x] **D2-T3** Invariants: alphabet-only, min-length padding, non-enumerability (consecutive ids → scattered codes), uniqueness over N, decode round-trip. *Added `SHORTCODE_KEY`/`SHORTCODE_MIN_LENGTH` + `config/shortcode.php`.*
+- **Tests:** `Base62Test`, `ShortCodeGeneratorTest` (unit) — green (full suite 124/124).
 
 ### Day 3 — Access-code admin CRUD (backend)
 Goal: admin can create/list/update/delete access codes end-to-end.
@@ -61,19 +68,28 @@ Goal: admin can create/list/update/delete access codes end-to-end.
 
 ### Day 4 — Redis cache + Kafka click event production
 Goal: redirects are cached and emit a click event without blocking.
-- [ ] **D4-T1** Add Kafka (🔒 decision 3) to Docker Compose + Kafka UI; config keys in `.env.example`.
+> **Reconciled with ADR-0002 (shipped).** The design that landed uses
+> `ClickEventPublisherInterface` with swappable drivers (`sync`/`kafka`/`log` via
+> `CLICK_EVENT_DRIVER`), not a single `KafkaClickProducer`. Verify the checkboxes
+> below meet the full Definition of Done (esp. tests) before ticking `[x]`.
+- [x] **D4-T1** Kafka in Docker Compose + Kafka UI. *Shipped `apache/kafka:3.8.0` (KRaft) + `kafka-ui` (decision 3), not Redpanda. Confirm `.env.example` documents `KAFKA_BROKERS`, `KAFKA_CLICK_TOPIC`, `CLICK_EVENT_DRIVER`.*
 - [ ] **D4-T2** Switch backend cache path to Redis for redirects; confirm `UrlRedirectService` cache hit/miss + TTL logic; add cache-bust on update/delete (already in `ShortUrlService`).
-- [ ] **D4-T3** Define `UrlClicked` domain event + payload DTO (code, timestamp, ip, user-agent, referer). Producer: `KafkaClickProducer` behind an interface; emit from redirect path **fire-and-forget**.
-- [ ] **D4-T4** Graceful degradation: if Kafka is down, redirect still succeeds (log + metric, never 500).
-- **Tests:** cache hit/miss unit; producer-called assertion with a fake/spy; redirect-still-works-when-producer-throws.
+- [x] **D4-T3** `UrlClicked` domain event emitted **fire-and-forget** from the redirect via `ClickEventPublisherInterface` (`Sync`/`Log`/`Kafka` impls). *Producer is driver-swappable, not a single `KafkaClickProducer`.*
+- [x] **D4-T4** Graceful degradation: Kafka down ⇒ redirect still 302 (never 500), `click.publish.failed` logged, and `click_publish_failures_total` metric increments. *Publish wrapped in try/catch; metric from OBS; asserted in `RedirectResilienceTest` (D4-T4b).*
+- **Tests:** cache hit/miss unit; publisher-called assertion with a fake/spy; redirect-still-works-when-publisher-throws. *Confirm these exist before ticking the above.*
 
 ### Day 5 — Kafka consumer + analytics store
-Goal: click events are consumed, enriched with device info, and persisted for the dashboard.
-- [ ] **D5-T1** Analytics schema (🔒 decision 4): `clicks` table (short_url_id, ip, ua, browser, os, device_type, referer, country?, created_at) + migration.
-- [ ] **D5-T2** Consumer worker (`php artisan clicks:consume`) reading `url.clicked`; idempotent handling.
-- [ ] **D5-T3** Device enrichment: parse user-agent (browser/os/device). Repository to persist clicks.
-- [ ] **D5-T4** Aggregate read models/queries for the dashboard (clicks over time, by device, top URLs).
-- **Tests:** consumer handler unit (given event → row written, enrichment correct); aggregate query tests.
+Goal: click events are consumed and projected into a read model for the dashboard.
+> **Reconciled with ADR-0002 (shipped).** The analytics store is event-sourced,
+> not a flat `clicks` table: append-only `click_events` (log) + `click_daily_aggregates`
+> (read model) in the same SQL DB, written only by a single `ClickProjector` shared
+> by the sync and Kafka paths. Device parsing is a *future projection*, not part of
+> the initial schema.
+- [x] **D5-T1** Analytics schema (decision 4): `click_events` + `click_daily_aggregates` migrations. *Event-sourced model per ADR-0002, not the flat `clicks` table originally sketched.*
+- [x] **D5-T2** Consumer worker (`php artisan clicks:consume` → `ConsumeClicks`) reading `url.clicked` and projecting via `ClickProjector`. *Confirm idempotency + tests before ticking DoD.*
+- [x] **D5-T3** Device enrichment projection: `Support\UserAgentParser` → `click_device_aggregates` read model via `ClickProjector` (off the hot path). *Hand-rolled UA classifier (no new dep); `UserAgentParserTest` + `DeviceProjectionTest` green.*
+- [x] **D5-T4** Aggregate read queries: by-device breakdown (`deviceBreakdown()` → `data.devices.{by_type,by_browser,by_os}`, sorted) added to the overview; clicks-over-time + top URLs verified existing. *Device breakdown is all-time.*
+- **Tests:** projector unit (given event → `click_events` row + aggregate updated); enrichment correctness; aggregate query tests.
 
 ### Day 6 — Frontend: auth + public "generate URL"
 Goal: a user with a code can shorten a URL; admin can log in.
@@ -93,19 +109,19 @@ Goal: admin dashboard shows analytics; admin manages codes.
 
 ### Day 8 — Observability: metrics, dashboards, structured logs
 Goal: the app is monitored the same way locally as it will be in cloud.
-- [ ] **D8-T1** Backend `/metrics` endpoint (Prometheus format): request count/latency histograms, redirect counter, cache hit ratio, kafka produce failures, consumer lag proxy.
-- [ ] **D8-T2** Structured JSON logging to stdout (request id, actor, code).
-- [ ] **D8-T3** Add Prometheus + Grafana to Docker Compose; provision scrape config + a LinkForge dashboard (traffic, latency, errors, business KPIs).
-- [ ] **D8-T4** `docs/architecture/observability.md`: metric names, dashboard panels, alert ideas.
-- **Tests:** `/metrics` exposes expected series; a smoke check that a redirect increments its counter.
+- [x] **D8-T1** Backend `/metrics` (Prometheus) via promphp + Redis(predis) storage: request count + latency histogram, redirect counter, cache hit/miss, publish failures, consumer-lag proxy. *(ADR-0004)*
+- [x] **D8-T2** Structured JSON logging to stdout (`stdout` channel) with `request_id`/`actor` context (`AssignRequestId`).
+- [x] **D8-T3** Prometheus + Grafana in Compose; provisioned scrape config + `LinkForge Overview` dashboard (`docker/prometheus`, `docker/grafana`).
+- [x] **D8-T4** `docs/architecture/observability.md` (metric names, panels, alert ideas).
+- **Tests:** ✅ `MetricsEndpointTest` — `/metrics` exposes series; a redirect increments its counter. Full suite 143/143.
 
 ### Day 9 — Test hardening + JMeter load testing
 Goal: confident coverage + a performance baseline.
-- [ ] **D9-T1** Raise backend coverage on services/repos; add cross-layer integration tests (create → redirect → click persisted).
-- [ ] **D9-T2** Raise frontend coverage on features; add a happy-path flow test.
-- [ ] **D9-T3** JMeter plans under `load/`: (a) redirect throughput, (b) create-url with code, (c) admin login+list. Parameterised, with a `README`.
-- [ ] **D9-T4** Run baseline, capture numbers (RPS, p95, error rate) into `docs/load-testing.md`; note bottlenecks.
-- **Tests:** the JMeter plans themselves + a documented baseline run.
+- [x] **D9-T1** Cross-layer integration test (`CreateRedirectClickFlowTest`: create → redirect → projected) + `AccessCodeService::validateAndConsume` gate coverage.
+- [x] **D9-T2** Frontend feature coverage already comprehensive (FE-TESTS). *No redundant flow test added — noted on the ticket.*
+- [x] **D9-T3** JMeter plans under `load/` (redirect throughput, create-with-code, admin login+list), parameterised via `-J` props, + `README`.
+- [x] **D9-T4** `docs/load-testing.md` baseline doc (method + RPS/p95/error table + bottlenecks). *Numbers `TBD` — JMeter not run in-session; template to fill from a real run.*
+- **Tests:** JMeter plans XML-validated; integration test green (suite 149/149). *Headless run + real baseline owed by a JMeter host.*
 
 ### Day 10 — Local end-to-end validation + Phase-2 skeleton
 Goal: prove the whole system locally; prepare (do not deploy) the cloud jump.
@@ -117,7 +133,23 @@ Goal: prove the whole system locally; prepare (do not deploy) the cloud jump.
 
 ---
 
-## Phase 2 — AWS deployment (backlog; start only after Phase 1 sign-off)
+## Phase 1.5 — Local Kubernetes (minikube) — **before cloud**
+
+> Deploy the whole app to a local k8s cluster with the full object set (scalable +
+> maintainable) and **prove HPA scales `api` under peak load**, before any AWS work.
+> DB stays host SQL Server (ADR-0003) via `host.minikube.internal`; Kustomize
+> base + `overlays/local`. The concrete, dependency-ordered ticket set is **K8S-0 …
+> K8S-14** in [`tickets.md`](tickets.md#phase-15--local-kubernetes-minikube). Summary:
+
+- [x] ADR-0005 (topology/tooling) · frontend image · Kustomize base+overlay · Namespace.
+- [x] Config/Secret · in-cluster Redis+Kafka · API Deployment+Service (requests/limits, probes) · clicks-worker · migration Job · frontend Deployment.
+- [x] Ingress · **HPA + metrics-server** · in-cluster Prometheus+Grafana · PDB + NetworkPolicy.
+- [x] Run tooling (`make k8s-*`) + `docs/k8s-local.md`. 🟡 **HPA load proof** authored (K8S-14) — recorded run owed on a live minikube.
+- _All manifests render-validated (`kubectl kustomize`); live `apply`/minikube + the HPA proof are owed on a cluster._
+
+---
+
+## Phase 2 — AWS deployment (backlog; start only after Phase 1.5 sign-off)
 
 > Detailed task breakdown will be expanded when Phase 1 is validated. High-level objects to produce:
 
